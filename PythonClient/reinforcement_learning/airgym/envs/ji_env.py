@@ -156,7 +156,7 @@ class AirSimDroneEnv(AirSimEnv):
         else:
             done = 0
 
-        APF= -self.APE()- self.RPE()
+        APF= -self.APE() - self.RPE()
 
         #print (self.APE(), self.RPE())
 

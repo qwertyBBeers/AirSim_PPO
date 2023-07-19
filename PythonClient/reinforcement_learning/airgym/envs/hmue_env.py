@@ -18,6 +18,7 @@ class AirSimEnv(AirSimEnv):
             "position" : np.zeros([1, 2]),
             "collision" : False,
             "goal_state" : np.zeros([1, 2]),
+            "velocity" : np.zeros(3),
         }
 
         self.drone = airsim.MultirotorClient(ip=ip_address)
@@ -73,15 +74,31 @@ class AirSimEnv(AirSimEnv):
 
         self.drone_state = self.drone.getMultirotorState()
 
+        #속도에 대한 입력값을 넣어주기 위함
+        vx = self.drone_state.kinematics_estimated.linear_velocity.x_val
+        vy = self.drone_state.kinematics_estimated.linear_velocity.y_val
+        yaw_rate = self.drone_state.kinematics_estimated.angular_velocity.z_val
+
+        #속도값 정보 업데이트
+        self.state["velocity"] = self.make_batch(np.array([vx, vy, yaw_rate]))
+
+        #이 부분을 수정해야 함
         self.state['position'] = np.array([
             (self.target_pos[0]-self.drone_state.kinematics_estimated.position.x_val),
             (self.target_pos[1]-self.drone_state.kinematics_estimated.position.y_val)
             ])
         
+        #충돌에 대한 정보 업데이트
         collision = self.drone.simGetCollisionInfo().has_collided
+        
+        #lidar 정보 업데이트    
         self.state["lidar"] = self.lidar_obs()
+        self.state["collision"] = collision
         raise self.state
 
+    def make_batch(self, x):
+        return np.expand_dims(x, axis=0)
+    
     def _do_action(self, action):
         yaw_rate = action
         
@@ -96,10 +113,8 @@ class AirSimEnv(AirSimEnv):
 
 
     def _compute_reward(self):
-        raise NotImplementedError()
-
-    def close(self):
-        raise NotImplementedError()
+        #reward를 어떻게 주어줄 지에 대해서 작성
+        raise reward, done
 
     def step(self, action):
         self._do_action(action)
@@ -108,5 +123,6 @@ class AirSimEnv(AirSimEnv):
 
         return obs, reward, done, self.state
 
-    def render(self):
+    def reset(self):
+        self._setup_flight()
         return self._get_obs()
