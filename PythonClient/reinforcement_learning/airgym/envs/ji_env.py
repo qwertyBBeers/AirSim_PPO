@@ -11,7 +11,7 @@ from PIL import Image as im
 from matplotlib import pyplot as plt
 from random import randrange
 import tensorflow as tf
-class AirSimDroneEnv(AirSimEnv):    
+class AirSimDroneEnv(AirSimEnv):
     def __init__(self, ip_address):
         super().__init__()
 
@@ -156,12 +156,12 @@ class AirSimDroneEnv(AirSimEnv):
         else:
             done = 0
 
-        APF= -self.APE() - self.RPE()
+        APF= -self.APE()- self.RPE()
 
         #print (self.APE(), self.RPE())
 
         if self.time<3:
-            self.prev_APF=APF
+            self.prev_APF=APF        
         reward= APF-self.prev_APF+collision
 
 

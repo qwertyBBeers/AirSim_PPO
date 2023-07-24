@@ -104,12 +104,19 @@ class ActorCritic(nn.Module):
     # 주어진 상태 (State)에 따른 행동(action)을 출력
     def act(self, state):
 
-        if self.has_continuous_action_space:
+        if self.has_continuous_action_space:    
             # state에 대한 action을 받음
             action_mean = self.actor(state)
-
+            # if action_mean[0] == 0:
+            #     action_mean[0] = 0.0000001
+            #     print("action_mean = 0")
+            # if action_mean[1] == 0:
+            #     action_mean[1] = 0.0000001
+            #     print("action_mean = 0")
             # 행동에 대한 공분산 행렬을 생성하는 부분
             cov_mat = torch.diag(self.action_var).unsqueeze(dim=0)
+            # cov_mat = torch.diag_embed(self.action_var).expand(action_mean.size(0), -1, -1)
+
 
             # 평균과 공분산 행렬을 입력으로 받아 다변수 정규분포 생성
             dist = MultivariateNormal(action_mean, cov_mat)
