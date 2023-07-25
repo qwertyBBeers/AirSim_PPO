@@ -51,7 +51,7 @@ class AirSimDroneEnv(AirSimEnv):
         self.drone.simSetVehiclePose(pose, ignore_collision=True)
 
         self.drone.moveToPositionAsync(start_x, start_y, start_z, 3).join()
-        self.drone.moveByVelocityAsync(1, 0.0, -0.8, 0).join()
+        self.drone.moveByVelocityAsync(1, 0.0, 1, 0).join()
         # 초기 드론 위치를 여기서 설정
     
     def _get_obs(self):
@@ -90,13 +90,13 @@ class AirSimDroneEnv(AirSimEnv):
         return result_array
 
     def _do_action(self, action):
-        yaw_rate = action*30
+        yaw_rate = action*20
         
         #x축 속도 고정, yaw의 회전만으로 장애물 회피
         self.drone.moveByVelocityZBodyFrameAsync(
-            vx = 5,
+            vx = 2,
             vy = 0.0,
-            z = 2,
+            z = 1.5,
             duration = 3,
             yaw_mode = airsim.YawMode(is_rate=True, yaw_or_rate= float(yaw_rate))
         )  
@@ -105,7 +105,7 @@ class AirSimDroneEnv(AirSimEnv):
     #     return np.expand_dims(x, axis=0)
 
     def AF(self):
-        att_gain = 0.002
+        att_gain = 0.005
         distance = np.linalg.norm([self.state["position"][0],self.state["position"][1]])
         att_Force = att_gain*distance
         return att_Force
@@ -143,22 +143,22 @@ class AirSimDroneEnv(AirSimEnv):
         
         if self.state['collision'] == True:
             done = 1
-            collision = -10
-            print("++++++++++++++++++++++++AF++++++++++++++++++++++++")
-            print(self.AF())
-            print("++++++++++++++++++++++++RF++++++++++++++++++++++++")
-            print(self.RF())
+            collision = -30
+            # print("++++++++++++++++++++++++AF++++++++++++++++++++++++")
+            # print(self.AF())
+            # print("++++++++++++++++++++++++RF++++++++++++++++++++++++")
+            # print(self.RF())
             
         elif x_dis>=100 or x_dis<-100 or y_dis>=100 or y_dis<-100:
             done=1
 
-        elif abs(self.state["position"][0])<5 and abs(self.state["position"][1])<5:
+        elif abs(self.state["position"][0])<6 and abs(self.state["position"][1])<6:
             done = 1
             goal = 100
-            print("++++++++++++++++++++++++AF++++++++++++++++++++++++")
-            print(self.AF())
-            print("++++++++++++++++++++++++RF++++++++++++++++++++++++")
-            print(self.RF())
+            # print("++++++++++++++++++++++++AF++++++++++++++++++++++++")
+            # print(self.AF())
+            # print("++++++++++++++++++++++++RF++++++++++++++++++++++++")
+            # print(self.RF())
             print("GOAL REACHED")
 
         else:

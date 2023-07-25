@@ -51,7 +51,7 @@ class AirSimDroneEnv(AirSimEnv):
         self.drone.simSetVehiclePose(pose, ignore_collision=True)
 
         self.drone.moveToPositionAsync(start_x, start_y, start_z, 3).join()
-        self.drone.moveByVelocityAsync(1, 0.0, -0.8, 0).join()
+        self.drone.moveByVelocityAsync(1, 0.0, 1, 0).join()
         # 초기 드론 위치를 여기서 설정
     
     def _get_obs(self):
@@ -96,7 +96,7 @@ class AirSimDroneEnv(AirSimEnv):
         self.drone.moveByVelocityZBodyFrameAsync(
             vx = 5,
             vy = 0.0,
-            z = 2,
+            z = 1.5,
             duration = 3,
             yaw_mode = airsim.YawMode(is_rate=True, yaw_or_rate= float(yaw_rate))
         )  
@@ -118,10 +118,12 @@ class AirSimDroneEnv(AirSimEnv):
         for obs_xy in self.points_:
             
             obs_dis = np.linalg.norm([obs_xy[0], obs_xy[1]])
+            obs_dis = 0.1 if obs_dis <= 0.1 else obs_dis
+            
             # print(obs_dis)
             if obs_dis < obstacle_bound:
                 if obs_dis != 0:
-                    rel_u= (1/(obs_dis) - 1/(obstacle_bound))**2
+                    rel_u= (1/(obs_dis) - 1/(obstacle_bound))**2                    
                 else:
                     pass
                 # print(rel_u)
@@ -142,21 +144,21 @@ class AirSimDroneEnv(AirSimEnv):
         if self.state['collision'] == True:
             done = 1
             collision = -10
-            # print("++++++++++++++++++++++++AF++++++++++++++++++++++++")
-            # print(self.AF())
-            # print("++++++++++++++++++++++++RF++++++++++++++++++++++++")
-            # print(self.RF())
+            print("++++++++++++++++++++++++AF++++++++++++++++++++++++")
+            print(self.AF())
+            print("++++++++++++++++++++++++RF++++++++++++++++++++++++")
+            print(self.RF())
             
         elif x_dis>=100 or x_dis<-100 or y_dis>=100 or y_dis<-100:
             done=1
 
         elif abs(self.state["position"][0])<5 and abs(self.state["position"][1])<5:
             done = 1
-            goal = 1000
-            # print("++++++++++++++++++++++++AF++++++++++++++++++++++++")
-            # print(self.AF())
-            # print("++++++++++++++++++++++++RF++++++++++++++++++++++++")
-            # print(self.RF())
+            goal = 100
+            print("++++++++++++++++++++++++AF++++++++++++++++++++++++")
+            print(self.AF())
+            print("++++++++++++++++++++++++RF++++++++++++++++++++++++")
+            print(self.RF())
             print("GOAL REACHED")
 
         else:

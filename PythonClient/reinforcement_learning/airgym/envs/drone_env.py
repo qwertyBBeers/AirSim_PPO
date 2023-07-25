@@ -36,7 +36,7 @@ class AirSimDroneEnv(AirSimEnv):
         self.drone.reset()
 
     def _setup_flight(self):
-        self.drone.reset()
+        self.drone.reset()  
         self.drone.enableApiControl(True)
         self.drone.armDisarm(True)
 
