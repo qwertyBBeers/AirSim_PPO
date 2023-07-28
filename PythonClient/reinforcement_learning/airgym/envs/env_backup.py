@@ -106,7 +106,7 @@ class AirSimDroneEnv(AirSimEnv):
 
     def AF(self):
         #distance 로 주는 방식
-
+        att_gain = 0.003
         distance = np.linalg.norm([self.state["position"][0],self.state["position"][1]])
         # print(self.target_pos[0])
         # print(self.start_x)
