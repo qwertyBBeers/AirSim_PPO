@@ -23,34 +23,59 @@ def train():
     env_name = "airsim"
     print("통과")
 
+    # 에이전트의 액션 공간이 연속적인지의 여부를 나타내는 변수
     has_continuous_action_space = True  # continuous action space; else discrete
 
-    max_ep_len = 1000                  # max timesteps in one episode
+    # 한 에피소드의 최대 타임스텝 수
+    max_ep_len = 2000                  # max timesteps in one episode
+    
+    # 훈련 루프가 종료되는 타임 스텝의 최대 수
     max_training_timesteps = int(3e6)   # break training loop if timeteps > max_training_timesteps
 
+    # 출력 하는 빈도 설정
     print_freq = max_ep_len * 10        # print avg reward in the interval (in num timesteps)
+    
+    # 평균 보상을 로깅하는 빈도
     log_freq = max_ep_len * 2           # log avg reward in the interval (in num timesteps)
+    
+    # 모델 저장 하는 빈도
     save_model_freq = int(1e5)          # save model frequency (in num timesteps)
 
-    action_std = 0.6                    # starting std for action distribution (Multivariate Normal)
+    # 시작하는 액션 분포의 표준 편차
+    action_std = 1.0                    # starting std for action distribution (Multivariate Normal)
+    
+    #action 표준 편차를 감소시킴
     action_std_decay_rate = 0.05        # linearly decay action_std (action_std = action_std - action_std_decay_rate)
+    
+    #액션 표준 편차의 최소값
     min_action_std = 0.1                # minimum action_std (stop decay after action_std <= min_action_std)
+
     action_std_decay_freq = int(2.5e5)  # action_std decay frequency (in num timesteps)
     #####################################################
 
     ## Note : print/log frequencies should be > than max_ep_len
 
     ################ PPO hyperparameters ################
-    update_timestep = max_ep_len * 4      # update policy every n timesteps
-    K_epochs = 80               # update policy for K epochs in one PPO update
+    
+        #Policy 업데이트를 위해 에이전트가 수집하는 Time step 수
+    # update_timestep = max_ep_len * 4      # update policy every n timesteps
+    update_timestep = 1000
+    # K_epochs = 80               # update policy for K epochs in one PPO update
+    # PPO 업데이트에서 사용되는 업데이트 반복 횟수
 
+    K_epochs = 40               
+
+    # PPO 알고리즘에서 사용되는 클리핑 범위
     eps_clip = 0.2          # clip parameter for PPO
     gamma = 0.99            # discount factor
 
-    lr_actor = 0.0003       # learning rate for actor network
-    lr_critic = 0.001       # learning rate for critic network
+    # Actor 네트워크 학습률, Critic 네트워크 학습률
+    lr_actor = 1e-4       # learning rate for actor network
+    # lr_actor = 0.0003       # learning rate for actor network
+    lr_critic = 1e-3       # learning rate for critic network
 
     random_seed = 0         # set random seed if required (0 = no random seed)
+    
     #####################################################
 
     print("training environment name : " + env_name)
@@ -58,11 +83,15 @@ def train():
     # env = gym.make(env_name)
 
     # state space dimension
+
+    # 신경망에 넣는 input 배열의 크기가 어떤 지
     state_dim = 1006
     # state_dim = env.observation_space.shape[0]
 
     # action space dimension
-    action_dim = 1
+    
+    # action 으로 나오는 배열의 크기가 어떤 지
+    action_dim = 2
     # if has_continuous_action_space:
     #     action_dim = env.action_space.shape[0]
     # else:
@@ -76,6 +105,7 @@ def train():
           os.makedirs(log_dir)
 
     log_dir = log_dir + '/' + env_name + '/'
+    # log_dir 이라는 폴더가 없으면 폴더를 만들고 저장
     if not os.path.exists(log_dir):
           os.makedirs(log_dir)
 
@@ -156,7 +186,7 @@ def train():
     ################# training procedure ################
 
     # initialize a PPO agent
-    ppo_agent = PPO(state_dim, action_dim, lr_actor, lr_critic, gamma, K_epochs, eps_clip, has_continuous_action_space, action_std)
+    ppo_agent = PPO(state_dim, action_dim, lr_actor, lr_critic, gamma, K_epochs, eps_clip, has_continuous_action_space, action_std, tensorboard_writer)
 
     # track total training time
     start_time = datetime.now().replace(microsecond=0)
@@ -165,8 +195,8 @@ def train():
     print("============================================================================================")
 
     # logging file
-    # log_f = open(log_f_name,"w+")
-    # log_f.write('episode,timestep,reward\n')
+    log_f = open(log_f_name,"w+")
+    log_f.write('episode,timestep,reward\n')
 
     # printing and logging variables
     print_running_reward = 0
@@ -178,29 +208,39 @@ def train():
     time_step = 0
     i_episode = 0
 
+    
+
     # training loop
     while time_step <= max_training_timesteps:
 
         state = env.reset()
         current_ep_reward = 0
-
+        
         for t in range(1, max_ep_len+1):
             # select action with policy
             lidar_data = state["lidar"]
+            lidar_data /= 20
+            non_zero = lidar_data[:, 1] != 0
+            lidar_data[non_zero,1] = (lidar_data[non_zero, 1] + 1)/2
             # print("---------checking lidar_data.shape : ")
             # print(lidar_data)
 
             position_data = state["position"]
+            position_data[0] = position_data[0]/33.4
+            position_data[1] = position_data[1]/25.35
             position_data = position_data.reshape(1, 2)
+            # print(position_data)
             # print("---------checking position_data.shape : ")
             # print(position_data)
 
-            collision_data = np.array([int(state["collision"]), 0])
+            collision_data = np.array([int(state["collision"]), 0])/2
             collision_data = collision_data.reshape(1, 2)
             # print("---------checking collision_data.shape : ")
             # print(collision_data)
 
             position_state_data = state["position_state"]
+            position_state_data[0] = (position_state_data[0]-93)/57
+            position_state_data[1] = (position_state_data[1]-13.5)/27.5
             position_state_data = position_state_data.reshape(1, 2)
             # print("---------checking position_state.shape : ")
             # print(position_state_data)
@@ -233,7 +273,7 @@ def train():
 
             # update PPO agent
             if time_step % update_timestep == 0:
-                ppo_agent.update()
+                ppo_agent.update(time_step)
 
             # if continuous action space; then decay action std of ouput action distribution
             if has_continuous_action_space and time_step % action_std_decay_freq == 0:
@@ -246,6 +286,7 @@ def train():
                 log_avg_reward = log_running_reward / log_running_episodes
                 log_avg_reward = round(log_avg_reward, 4)
                 
+                # tensorboard_writer.scalar("Average Reward", log_avg_reward, step=time_step)
                 tf.summary.scalar("Average Reward", log_avg_reward, step=time_step)
 
                 tf.summary.flush()
@@ -267,14 +308,15 @@ def train():
                 
                 tf.summary.scalar("Average Reward (Print)", print_avg_reward, step=time_step)
                 tf.summary.flush()
+
                 print_running_reward = 0
                 print_running_episodes = 0
 
             # save model weights
             if time_step % save_model_freq == 0:
                 print("--------------------------------------------------------------------------------------------")
-                # print("saving model at : " + checkpoint_path)
-                # ppo_agent.save(checkpoint_path)
+                print("saving model at : " + checkpoint_path)
+                ppo_agent.save(checkpoint_path)
                 print("model saved")
                 print("Elapsed Time  : ", datetime.now().replace(microsecond=0) - start_time)
                 print("--------------------------------------------------------------------------------------------")
@@ -294,7 +336,7 @@ def train():
 
         i_episode += 1
 
-    # log_f.close()
+    log_f.close()
     env.close()
 
     # print total training time

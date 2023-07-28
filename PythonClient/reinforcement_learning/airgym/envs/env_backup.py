@@ -105,10 +105,16 @@ class AirSimDroneEnv(AirSimEnv):
     #     return np.expand_dims(x, axis=0)
 
     def AF(self):
-        att_gain = 0.002
+        #distance 로 주는 방식
+
         distance = np.linalg.norm([self.state["position"][0],self.state["position"][1]])
-        att_Force = att_gain*distance
-        return att_Force
+        # print(self.target_pos[0])
+        # print(self.start_x)
+        # max_dis = np.linalg.norm(self.target_pos[0]-self.start_pos[0], self.target_pos[1]-self.start_pos[1])
+        max_dis = np.sqrt((self.target_pos[0]-self.start_x)**2+(self.target_pos[1]-self.start_y)**2)
+        att_Force = att_gain*(max_dis - distance)
+        # print(att_Force)
+
     
     def RF(self):
         rel_gain = 0.001

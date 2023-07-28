@@ -21,6 +21,7 @@ class AirSimDroneEnv(AirSimEnv):
         }
 
         self.drone = airsim.MultirotorClient(ip=ip_address)
+        self.start= time.time()
 
         self._setup_flight()
 
@@ -32,26 +33,31 @@ class AirSimDroneEnv(AirSimEnv):
         self.drone.enableApiControl(True)
         self.drone.armDisarm(True)
 
-        start_position = [[87, -4.63], [87, -3.70], [87, -2.06], [87, -0.29], [87, 1.43], [87, 4.78], [87, 6.56], [87, 8.4]]
-        target_position = [[135.37, 25.26], [135.37, 23.26], [135.51, 26.87], [135.51, 28.69], [138.14, 28.26], [137.85, 26.71], [137.83, 23.28], [137.83, 23.26]]
-
+        # start_position = [[87, 15.0], [87, 15.5], [87, 16.0], [87, 16.5], [87, 17.0], [87, 17.5], [87, 18.0], [87, 18.5]]
+        start_position = [[95, 16.0]]
+        # target_position = [[135.37, 25.26], [135.37, 23.26], [135.51, 26.87], [135.51, 28.69], [138.14, 28.26], [137.85, 26.71], [137.83, 23.28], [137.83, 23.26]]
+        target_position = [[126.40, 38.85]]
+        # start_position = [[0, 0]]
+        # target_position = [[10.00,0.16]]
         random_start = random.choice(start_position)
 
-        start_x = random_start[0]
-        start_y = random_start[1]
-        start_z = 0
+        self.start_x = random_start[0]
+        self.start_y = random_start[1]
+        start_z = 1.2
 
         start_index = start_position.index(random_start)
-
+        
         #여기서 설정한 target_pos는 그냥 내가 쓰기 위해 설정하는 것일 뿐이다.
         self.target_pos = target_position[start_index]
 
-        position = airsim.Vector3r(start_x, start_y, start_z)
+        position = airsim.Vector3r(self.start_x, self.start_y, start_z)
         pose = airsim.Pose(position)
         self.drone.simSetVehiclePose(pose, ignore_collision=True)
 
-        self.drone.moveToPositionAsync(start_x, start_y, start_z, 3).join()
-        self.drone.moveByVelocityAsync(1, 0.0, 1, 0).join()
+        self.start = time.time()
+
+        self.drone.moveToPositionAsync(self.start_x, self.start_y, start_z, 3).join()
+        self.drone.moveByVelocityAsync(1, 0.0, 1.2, 0).join()
         # 초기 드론 위치를 여기서 설정
     
     def _get_obs(self):
@@ -60,8 +66,8 @@ class AirSimDroneEnv(AirSimEnv):
 
         #이 부분을 수정해야 함
         self.state["position"] = np.array([
-            (self.target_pos[0]-self.drone_state.kinematics_estimated.position.x_val),
-            (self.target_pos[1]-self.drone_state.kinematics_estimated.position.y_val)
+            abs(self.target_pos[0]-self.drone_state.kinematics_estimated.position.x_val),
+            abs(self.target_pos[1]-self.drone_state.kinematics_estimated.position.y_val)
             ])
         
         # 너무 멀리 갔을 때를 위해 설정        
@@ -77,7 +83,7 @@ class AirSimDroneEnv(AirSimEnv):
         return self.state
     
     def lidar_obs(self):
-        #총 500개의 배열에 lidar 정보가 들어온 만큼이 들어간다.
+        #총 500개의 배열에 lidar 정보가 들  어온 만큼이 들어간다.
         lidar_data = self.drone.getLidarData()
         
         points = np.array(lidar_data.point_cloud, dtype=np.dtype('f4'))
@@ -90,13 +96,14 @@ class AirSimDroneEnv(AirSimEnv):
         return result_array
 
     def _do_action(self, action):
-        yaw_rate = action*20
-        
+        yaw_rate = action[1]*20
+        vx_action = action[0] + 1.2
         #x축 속도 고정, yaw의 회전만으로 장애물 회피
+        
         self.drone.moveByVelocityZBodyFrameAsync(
-            vx = 2,
+            vx = vx_action*2.0,
             vy = 0.0,
-            z = 1.5,
+            z = 1.2,
             duration = 3,
             yaw_mode = airsim.YawMode(is_rate=True, yaw_or_rate= float(yaw_rate))
         )  
@@ -105,15 +112,47 @@ class AirSimDroneEnv(AirSimEnv):
     #     return np.expand_dims(x, axis=0)
 
     def AF(self):
-        att_gain = 0.005
+
+        att_gain = 0.002
         distance = np.linalg.norm([self.state["position"][0],self.state["position"][1]])
         att_Force = att_gain*distance
         return att_Force
+        
+        # x, y로 주는 방식
+        
+        # distance_x = self.state["position"][0] # target - current
+        # distance_y = self.state["position"][1] # target - current
+        # max_dis_x = self.target_pos[0] - self.start_x
+        # max_dis_y = self.target_pos[1] - self.start_y
+        
+        # att_Force = att_gain*(max_dis_x + max_dis_y - distance_x - distance_y)
+        return att_Force
     
+    # def vector(self):
+    #     vector_gain = 0.003
+    #     yaw = airsim.to_eularian_angles(self.drone_state.kinematics_estimated.orientation)[2]
+        
+    #     x = np.cos(yaw)
+    #     y = np.sin(yaw)
+
+    #     direction_vector = np.array([x, y])
+
+    #     distance = np.linalg.norm([self.state["position"][0],self.state["position"][1]])
+    #     target_vector = self.state["position"]/distance # 현재 방향 벡터
+
+    #     # 많이 다르면 -1, 방향이 같으면 1
+    #     cosine_similarity = np.dot(direction_vector, target_vector)   
+        
+    #     vector_Force = vector_gain*cosine_similarity
+    #     # print(vector_Force)
+
+    #     return vector_Force
+
+
     def RF(self):
         rel_gain = 0.001
         rel_sum = 0
-        obstacle_bound = 5
+        obstacle_bound = 2
         rel_u = 0
         for obs_xy in self.points_:
             
@@ -138,35 +177,57 @@ class AirSimDroneEnv(AirSimEnv):
         goal = 0
         done = 0
         collision = False
-        x_dis = self.target_pos[0] - self.state["position_state"][0]  
-        y_dis = self.target_pos[1] - self.state["position_state"][1]
+        out = 0
+        # x_dis = self.target_pos[0] - s    elf.state["position_state"][0]  
+        # y_dis = self.target_pos[1] - self.state["position_state"][1]
         
+        x_val = self.state["position_state"][0]
+        y_val = self.state["position_state"][1]
+
         if self.state['collision'] == True:
             done = 1
             collision = -30
-            # print("++++++++++++++++++++++++AF++++++++++++++++++++++++")
-            # print(self.AF())
-            # print("++++++++++++++++++++++++RF++++++++++++++++++++++++")
-            # print(self.RF())
-            
-        elif x_dis>=100 or x_dis<-100 or y_dis>=100 or y_dis<-100:
-            done=1
-
-        elif abs(self.state["position"][0])<6 and abs(self.state["position"][1])<6:
+            print("++++++++++++++++++++++++AF++++++++++++++++++++++++")
+            print(self.AF())
+            print("++++++++++++++++++++++++RF++++++++++++++++++++++++")
+            print(self.RF())
+            # print("++++++++++++++++++++++++VC++++++++++++++++++++++++")
+            # print(self.vector())
+        
+        # 일정 boundary 생성, 일정 범위 밖으로 나가게 되면 episode 끝 및 reward 낮은 값 줌
+        elif x_val >= 150.0 or x_val<= 93.0 or y_val > 41.0 or y_val < 13.5:
+            out = -30
             done = 1
-            goal = 100
-            # print("++++++++++++++++++++++++AF++++++++++++++++++++++++")
-            # print(self.AF())
-            # print("++++++++++++++++++++++++RF++++++++++++++++++++++++")
-            # print(self.RF())
+            print("++++++++++++++++++++++++AF++++++++++++++++++++++++")
+            print(self.AF())
+            print("++++++++++++++++++++++++RF++++++++++++++++++++++++")
+            print(self.RF())
+            # print("++++++++++++++++++++++++VC++++++++++++++++++++++++")
+            # print(self.vector())
+
+
+        elif self.state["position"][0]<7 and self.state["position"][1]<7:
+            done = 1
+            goal = 300
+            print("++++++++++++++++++++++++AF++++++++++++++++++++++++")
+            print(self.AF())
+            print("++++++++++++++++++++++++RF++++++++++++++++++++++++")
+            print(self.RF())
+            # print("++++++++++++++++++++++++VC++++++++++++++++++++++++")
+            # print(self.vector())
+
             print("GOAL REACHED")
 
         else:
             done = 0
         
+        # AF = 거리, RF = 장애물 충돌, vector = 방향
+        # APF = self.AF() - self.RF() + self.vector()
         APF = -self.AF() - self.RF()
 
-        reward = APF + collision + goal
+        # APF = self.AF() + self.vector()
+
+        reward = APF + collision + goal + out
         
         return reward, done
 

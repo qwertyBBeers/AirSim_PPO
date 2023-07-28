@@ -1,4 +1,5 @@
 import torch
+import tensorflow as tf
 import torch.nn as nn
 from torch.distributions import MultivariateNormal
 from torch.distributions import Categorical
@@ -107,12 +108,7 @@ class ActorCritic(nn.Module):
         if self.has_continuous_action_space:    
             # state에 대한 action을 받음
             action_mean = self.actor(state)
-            # if action_mean[0] == 0:
-            #     action_mean[0] = 0.0000001
-            #     print("action_mean = 0")
-            # if action_mean[1] == 0:
-            #     action_mean[1] = 0.0000001
-            #     print("action_mean = 0")
+            
             # 행동에 대한 공분산 행렬을 생성하는 부분
             cov_mat = torch.diag(self.action_var).unsqueeze(dim=0)
             # cov_mat = torch.diag_embed(self.action_var).expand(action_mean.size(0), -1, -1)
@@ -173,7 +169,7 @@ class ActorCritic(nn.Module):
 
 # PPO 알고리즘 구현
 class PPO:
-    def __init__(self, state_dim, action_dim, lr_actor, lr_critic, gamma, K_epochs, eps_clip, has_continuous_action_space, action_std_init=0.6):
+    def __init__(self, state_dim, action_dim, lr_actor, lr_critic, gamma, K_epochs, eps_clip, has_continuous_action_space, action_std_init, tensorboard_writer):
 
         self.has_continuous_action_space = has_continuous_action_space
 
@@ -188,6 +184,8 @@ class PPO:
 
         self.policy = ActorCritic(state_dim, action_dim, has_continuous_action_space, action_std_init).to(device)
         
+        self.tensorboard_writer = tensorboard_writer
+
         # Adam 을 사용하여 옵티마이저 설정.여기서 [파라미터 초기화 -> 그래디언트 계산 -> 파라미터 업데이트]를 반복한다.
         self.optimizer = torch.optim.Adam([
                         # self.policy.actor는 actor의 신경망의 파라미터들을 나타냄
@@ -266,7 +264,7 @@ class PPO:
             return action.item()
     
     # 정책을 업데이트 하는 역할. 에이전트가 수집한 경험 데이터를 기반으로 정책을 최적화하여 학습
-    def update(self):
+    def update(self, time_step):
         # Monte Carlo estimate of returns
         rewards = []
         discounted_reward = 0
@@ -334,7 +332,10 @@ class PPO:
 
         # clear buffer
         self.buffer.clear()
-    
+
+        # logging
+        tf.summary.scalar("loss", loss.mean().detach().cpu().numpy(), step=time_step)
+
     def save(self, checkpoint_path):
         torch.save(self.policy_old.state_dict(), checkpoint_path)
    
