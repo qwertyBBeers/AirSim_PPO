@@ -113,15 +113,16 @@ class AirSimDroneEnv(AirSimEnv):
 
     def AF(self):
 
-        att_gain = 0.002
-        distance = np.linalg.norm([self.state["position"][0],self.state["position"][1]])
+        att_gain = 0.02
+        # [0 ~ 1] nomalize
+        distance = np.linalg.norm([self.state["position"][0],self.state["position"][1]]) / 63.28
         att_Force = att_gain*distance
         return att_Force
         
         # x, y로 주는 방식
         
         # distance_x = self.state["position"][0] # target - current
-        # distance_y = self.state["position"][1] # target - current
+        # distance_y = self.state["positin"][1] # target - current
         # max_dis_x = self.target_pos[0] - self.start_x
         # max_dis_y = self.target_pos[1] - self.start_y
         
@@ -148,12 +149,14 @@ class AirSimDroneEnv(AirSimEnv):
 
     #     return vector_Force
 
-
+    #nomalize [0 ~ 1]
     def RF(self):
-        rel_gain = 0.001
+        rel_gain = 0.01
         rel_sum = 0
         obstacle_bound = 2
         rel_u = 0
+        len_lidar = 0.0001
+        
         for obs_xy in self.points_:
             
             obs_dis = np.linalg.norm([obs_xy[0], obs_xy[1]])
@@ -162,14 +165,16 @@ class AirSimDroneEnv(AirSimEnv):
             # print(obs_dis)
             if obs_dis < obstacle_bound:
                 if obs_dis != 0:
-                    rel_u= (1/(obs_dis) - 1/(obstacle_bound))**2                    
+                    rel_u= (1/(obs_dis) - 1/(obstacle_bound))**2
+                    len_lidar += 1                    
                 else:
                     pass
                 # print(rel_u)
             else:
                 rel_u = 0
             rel_sum += rel_u
-        rel_Force = 1/2*rel_gain*rel_sum
+            rel_sum = rel_sum/(len_lidar*90.25)
+        rel_Force = rel_gain*rel_sum
         return rel_Force
 
     def _compute_reward(self):
@@ -186,7 +191,7 @@ class AirSimDroneEnv(AirSimEnv):
 
         if self.state['collision'] == True:
             done = 1
-            collision = -30
+            collision = -10
             print("++++++++++++++++++++++++AF++++++++++++++++++++++++")
             print(self.AF())
             print("++++++++++++++++++++++++RF++++++++++++++++++++++++")
@@ -208,7 +213,7 @@ class AirSimDroneEnv(AirSimEnv):
 
         elif self.state["position"][0]<7 and self.state["position"][1]<7:
             done = 1
-            goal = 300
+            goal = 100
             print("++++++++++++++++++++++++AF++++++++++++++++++++++++")
             print(self.AF())
             print("++++++++++++++++++++++++RF++++++++++++++++++++++++")
