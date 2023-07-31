@@ -42,7 +42,7 @@ def train():
     save_model_freq = int(1e5)          # save model frequency (in num timesteps)
 
     # 시작하는 액션 분포의 표준 편차
-    action_std = 1.0                    # starting std for action distribution (Multivariate Normal)
+    action_std = 0.6                    # starting std for action distribution (Multivariate Normal)
     
     #action 표준 편차를 감소시킴
     action_std_decay_rate = 0.05        # linearly decay action_std (action_std = action_std - action_std_decay_rate)
@@ -91,7 +91,7 @@ def train():
     # action space dimension
     
     # action 으로 나오는 배열의 크기가 어떤 지
-    action_dim = 2
+    action_dim = 1
     # if has_continuous_action_space:
     #     action_dim = env.action_space.shape[0]
     # else:

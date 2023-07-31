@@ -96,12 +96,12 @@ class AirSimDroneEnv(AirSimEnv):
         return result_array
 
     def _do_action(self, action):
-        yaw_rate = action[1]*20
-        vx_action = action[0] + 1.2
+        yaw_rate = action*20
+        vx_action = 3.0
         #x축 속도 고정, yaw의 회전만으로 장애물 회피
         
         self.drone.moveByVelocityZBodyFrameAsync(
-            vx = vx_action*2.0,
+            vx = vx_action,
             vy = 0.0,
             z = 1.2,
             duration = 3,
@@ -113,7 +113,7 @@ class AirSimDroneEnv(AirSimEnv):
 
     def AF(self):
 
-        att_gain = 0.02
+        att_gain = 0.05
         # [0 ~ 1] nomalize
         distance = np.linalg.norm([self.state["position"][0],self.state["position"][1]]) / 63.28
         att_Force = att_gain*distance
@@ -128,26 +128,6 @@ class AirSimDroneEnv(AirSimEnv):
         
         # att_Force = att_gain*(max_dis_x + max_dis_y - distance_x - distance_y)
         return att_Force
-    
-    # def vector(self):
-    #     vector_gain = 0.003
-    #     yaw = airsim.to_eularian_angles(self.drone_state.kinematics_estimated.orientation)[2]
-        
-    #     x = np.cos(yaw)
-    #     y = np.sin(yaw)
-
-    #     direction_vector = np.array([x, y])
-
-    #     distance = np.linalg.norm([self.state["position"][0],self.state["position"][1]])
-    #     target_vector = self.state["position"]/distance # 현재 방향 벡터
-
-    #     # 많이 다르면 -1, 방향이 같으면 1
-    #     cosine_similarity = np.dot(direction_vector, target_vector)   
-        
-    #     vector_Force = vector_gain*cosine_similarity
-    #     # print(vector_Force)
-
-    #     return vector_Force
 
     #nomalize [0 ~ 1]
     def RF(self):
@@ -176,6 +156,26 @@ class AirSimDroneEnv(AirSimEnv):
             rel_sum = rel_sum/(len_lidar*90.25)
         rel_Force = rel_gain*rel_sum
         return rel_Force
+        
+    def vector(self):
+        vector_gain = 0.001
+        yaw = airsim.to_eularian_angles(self.drone_state.kinematics_estimated.orientation)[2]
+        
+        x = np.cos(yaw)
+        y = np.sin(yaw)
+
+        direction_vector = np.array([x, y])
+
+        distance = np.linalg.norm([self.state["position"][0],self.state["position"][1]])
+        target_vector = self.state["position"]/distance # 현재 방향 벡터
+
+        # 많이 다르면 0, 방향이 같으면 1
+        cosine_similarity = np.dot(direction_vector, target_vector)
+        
+        vector_Force = vector_gain*cosine_similarity
+        # print(vector_Force)
+
+        return vector_Force
 
     def _compute_reward(self):
         #reward를 어떻게 주어줄 지에 대해서 작성
@@ -191,22 +191,22 @@ class AirSimDroneEnv(AirSimEnv):
 
         if self.state['collision'] == True:
             done = 1
-            collision = -10
-            print("++++++++++++++++++++++++AF++++++++++++++++++++++++")
-            print(self.AF())
-            print("++++++++++++++++++++++++RF++++++++++++++++++++++++")
-            print(self.RF())
+            collision = -80
+            # print("++++++++++++++++++++++++AF++++++++++++++++++++++++")
+            # print(self.AF())
+            # print("++++++++++++++++++++++++RF++++++++++++++++++++++++")
+            # print(self.RF())
             # print("++++++++++++++++++++++++VC++++++++++++++++++++++++")
             # print(self.vector())
         
         # 일정 boundary 생성, 일정 범위 밖으로 나가게 되면 episode 끝 및 reward 낮은 값 줌
         elif x_val >= 150.0 or x_val<= 93.0 or y_val > 41.0 or y_val < 13.5:
-            out = -30
+            out = -80
             done = 1
-            print("++++++++++++++++++++++++AF++++++++++++++++++++++++")
-            print(self.AF())
-            print("++++++++++++++++++++++++RF++++++++++++++++++++++++")
-            print(self.RF())
+            # print("++++++++++++++++++++++++AF++++++++++++++++++++++++")
+            # print(self.AF())
+            # print("++++++++++++++++++++++++RF++++++++++++++++++++++++")
+            # print(self.RF())
             # print("++++++++++++++++++++++++VC++++++++++++++++++++++++")
             # print(self.vector())
 
@@ -214,10 +214,10 @@ class AirSimDroneEnv(AirSimEnv):
         elif self.state["position"][0]<7 and self.state["position"][1]<7:
             done = 1
             goal = 100
-            print("++++++++++++++++++++++++AF++++++++++++++++++++++++")
-            print(self.AF())
-            print("++++++++++++++++++++++++RF++++++++++++++++++++++++")
-            print(self.RF())
+            # print("++++++++++++++++++++++++AF++++++++++++++++++++++++")
+            # print(self.AF())
+            # print("++++++++++++++++++++++++RF++++++++++++++++++++++++")
+            # print(self.RF())
             # print("++++++++++++++++++++++++VC++++++++++++++++++++++++")
             # print(self.vector())
 
@@ -227,8 +227,8 @@ class AirSimDroneEnv(AirSimEnv):
             done = 0
         
         # AF = 거리, RF = 장애물 충돌, vector = 방향
-        # APF = self.AF() - self.RF() + self.vector()
-        APF = -self.AF() - self.RF()
+        APF = self.AF() - self.RF() + self.vector()
+        # APF = -self.AF() - self.RF()
 
         # APF = self.AF() + self.vector()
 
