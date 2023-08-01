@@ -1,65 +1,30 @@
 import airsim
-import os
+import numpy as np
 
-import time
-import sys
-
+# AirSim 클라이언트 생성
 client = airsim.MultirotorClient()
+
+# 드론 연결
 client.confirmConnection()
-client.enableApiControl(True)
-client.armDisarm(True)
-client.takeoffAsync().join()
 
-z = 1.5
-duration = 1
-vx = 0
-vy = 0
-yaw_rate = 0
-def get_key_input():
-    global vx, vy, yaw_rate
-    while True:
-        key = input("input Key : ")
-        if key.lower() == 'w':
-            vx = 5
-            vy = 0
-            yaw_rate = 0
-            return vx, vy
-        elif key.lower() == 'a':
-            vx = 0
-            vy = -5
-            yaw_rate = -20
-            return vx, vy
-        elif key.lower() == 's':
-            vx = -5
-            vy = 0
-            yaw_rate = -30
-            return vx, vy
-        elif key.lower() == 'd':
-            vx = 0
-            vy = 5
-            yaw_rate = 20
-            return vx, vy
-        else:
-            vx = 0
-            vy = 0
-            return vx, vy
+def get_drone_direction_vector():
+    # 드론 상태 정보 가져오기
+    state = client.getMultirotorState()
 
-if __name__ == "__main__":
-    while True:
-        vx, vy = get_key_input()
+    # 드론 요(Yaw) 각도 가져오기
+    yaw = airsim.to_eularian_angles(state.kinematics_estimated.orientation)[2]
 
-        # client.moveByVelocityAsync(5, 0, 0, duration=5).join()
-        # client.moveByVelocityZBodyFrameAsync(vx = 5.0, vy = 0.0, z = 1.0, duration = 5).join()
-        # client.rotateByYawRateAsync(yaw_rate=yaw_rate, duration=5).join()
-        client.moveByVelocityZBodyFrameAsync(
-            vx = 5,
-            vy = 0.0,
-            z = -5.0,
-            duration = 3,
-            yaw_mode = airsim.YawMode(is_rate=True, yaw_or_rate= float(yaw_rate))
-        )
-        
-        print(vx)
-        print(vy)
-        print("------------------")
-    
+    # 방향 벡터 계산
+    x = np.cos(yaw)
+    y = np.sin(yaw)
+    z = 0.0  # Z 축 방향은 피치와 롤이 고정되어 있으므로 항상 0으로 가정
+
+    direction_vector = np.array([x, y, z])
+
+    return direction_vector
+
+# 드론 방향 벡터 가져오기
+direction_vector = get_drone_direction_vector()
+
+# 출력
+print("Drone Direction Vector: {}".format(direction_vector))

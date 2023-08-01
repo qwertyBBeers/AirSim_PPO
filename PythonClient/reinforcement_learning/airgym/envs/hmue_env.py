@@ -81,29 +81,7 @@ class AirSimDroneEnv(AirSimEnv):
         self.state["lidar"] = self.lidar_obs()
         self.state["collision"] = collision
 
-        lidar_data = self.state["lidar"]
-        lidar_data /= 20
-        non_zero = lidar_data[:, 1] != 0
-        lidar_data[non_zero,1] = (lidar_data[non_zero, 1] + 1)/2
-        lidar_data = lidar_data.reshape(1,1000)
-        # print("---------checking lidar_data.shape : ")
-        # print(lidar_data)
-
-        position_data = self.state["position"]
-        position_data[0] = position_data[0]/33.4
-        position_data[1] = position_data[1]/25.35
-        position_data = position_data.reshape(1, 2)
-        # print(position_data)
-        # print("---------checking position_data.shape : ")
-        # print(position_data)
-
-        position_state_data = self.state["position_state"]
-        position_state_data[0] = (position_state_data[0]-93)/57
-        position_state_data[1] = (position_state_data[1]-13.5)/27.5
-        position_state_data = position_state_data.reshape(1, 2)
-        obs_state = np.concatenate((lidar_data, position_data, position_state_data), axis=1)
-
-        return obs_state
+        return self.state
     
     def lidar_obs(self):
         #총 500개의 배열에 lidar 정보가 들  어온 만큼이 들어간다.

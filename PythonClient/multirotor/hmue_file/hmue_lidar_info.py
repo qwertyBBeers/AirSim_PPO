@@ -13,13 +13,14 @@ def lidar_to_image():
     points = np.array(lidar_data.point_cloud, dtype=np.dtype('f4'))
     points = np.reshape(points, (int(points.shape[0] / 3), 3))
     points_ = points[:,:-1]
+    points_ /= 20
     # print(len(points_))
     # print("mmmmmmmmmmmmmmm")
     # print(points_)
 
     result_array = np.zeros((500, 2), dtype=np.dtype('f4'))
     result_array[:points_.shape[0]] = points_
-    print(len(result_array))
+    print(result_array)
     print("mmmmmmmmmmmmmmm")
     # print(result_array)
     # # 이미지 크기 및 범위 설정

@@ -10,7 +10,7 @@ client.enableApiControl(True)
 client.armDisarm(True)
 client.takeoffAsync().join()
 
-z = 1.5
+z = 0
 duration = 1
 vx = 0
 vy = 0
