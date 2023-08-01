@@ -1,6 +1,6 @@
 from train import SACagent
 import gym
-from envs.jinwoo_env import AirSimDroneEnv
+from airgym.envs.ji_env import AirSimDroneEnv
 import numpy as np
 import sys
 import time

@@ -85,7 +85,7 @@ def train():
     # state space dimension
 
     # 신경망에 넣는 input 배열의 크기가 어떤 지
-    state_dim = 1006
+    state_dim = 1004
     # state_dim = env.observation_space.shape[0]
 
     # action space dimension
@@ -222,6 +222,7 @@ def train():
             lidar_data /= 20
             non_zero = lidar_data[:, 1] != 0
             lidar_data[non_zero,1] = (lidar_data[non_zero, 1] + 1)/2
+            lidar_data = lidar_data.reshape(1,1000)
             # print("---------checking lidar_data.shape : ")
             # print(lidar_data)
 
@@ -233,20 +234,14 @@ def train():
             # print("---------checking position_data.shape : ")
             # print(position_data)
 
-            collision_data = np.array([int(state["collision"]), 0])/2
-            collision_data = collision_data.reshape(1, 2)
-            # print("---------checking collision_data.shape : ")
-            # print(collision_data)
-
             position_state_data = state["position_state"]
             position_state_data[0] = (position_state_data[0]-93)/57
             position_state_data[1] = (position_state_data[1]-13.5)/27.5
             position_state_data = position_state_data.reshape(1, 2)
             # print("---------checking position_state.shape : ")
             # print(position_state_data)
+            state_data = np.concatenate((lidar_data, position_data, position_state_data), axis=1)
 
-            state_data = np.concatenate([lidar_data, position_data, collision_data, position_state_data], axis=0)
-            state_data = state_data.reshape(1,1006)
             # print("---------checking state_data.shape : ")
             # print(state_data.shape)
 
