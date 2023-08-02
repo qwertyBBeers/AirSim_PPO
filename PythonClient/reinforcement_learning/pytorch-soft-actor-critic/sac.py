@@ -7,6 +7,7 @@ from model import GaussianPolicy, QNetwork, DeterministicPolicy
 import numpy as np
 
 class SAC(object):
+    #SAC 클래스 생성자 메서드 정의. 입력 차원, 액션 공간, 기타 설정 값 받는다.
     def __init__(self, num_inputs, action_space, args):
 
         self.gamma = args.gamma
@@ -52,7 +53,7 @@ class SAC(object):
     def update_parameters(self, memory, batch_size, updates):
         # Sample a batch from memory
         state_batch, action_batch, reward_batch, next_state_batch, mask_batch = memory.sample(batch_size=batch_size)
-        print(state_batch.shape)
+        # print(state_batch.shape)
         state_batch = torch.FloatTensor(state_batch).to(self.device)
         next_state_batch = torch.FloatTensor(next_state_batch).to(self.device)
         action_batch = torch.FloatTensor(action_batch).to(self.device)
@@ -61,7 +62,7 @@ class SAC(object):
 
         with torch.no_grad():
             next_state_action, next_state_log_pi, _ = self.policy.sample(next_state_batch)
-            print(next_state_action.shape)
+            # print(next_state_action.shape)
             qf1_next_target, qf2_next_target = self.critic_target(next_state_batch, next_state_action)
             min_qf_next_target = torch.min(qf1_next_target, qf2_next_target) - self.alpha * next_state_log_pi
             next_q_value = reward_batch + mask_batch * self.gamma * (min_qf_next_target)

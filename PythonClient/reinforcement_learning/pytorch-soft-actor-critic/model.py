@@ -12,7 +12,9 @@ def weights_init_(m):
     if isinstance(m, nn.Linear):
         torch.nn.init.xavier_uniform_(m.weight, gain=1)
         torch.nn.init.constant_(m.bias, 0)
-
+    if isinstance(m, nn.Conv2d):
+        torch.nn.init.xavier_uniform_(m.weight, gain=1)
+        torch.nn.init.constant_(m.bias, 0)
 
 class ValueNetwork(nn.Module):
     def __init__(self, num_inputs, hidden_dim):
@@ -25,37 +27,59 @@ class ValueNetwork(nn.Module):
         self.apply(weights_init_)
 
     def forward(self, state):
-        x = F.relu(self.linear1(state))
+        x = F.relu(self.linear1(state))   
         x = F.relu(self.linear2(x))
         x = self.linear3(x)
         return x
-
 
 class QNetwork(nn.Module):
     def __init__(self, num_inputs, num_actions, hidden_dim):
         super(QNetwork, self).__init__()
 
         # Q1 architecture
-        self.linear1 = nn.Linear(num_inputs + num_actions, hidden_dim)
-        self.linear2 = nn.Linear(hidden_dim, hidden_dim)
-        self.linear3 = nn.Linear(hidden_dim, 1)
+        # self.linear1 = nn.Linear(num_inputs + num_actions, hidden_dim)
+        # self.linear2 = nn.Linear(hidden_dim, hidden_dim)
+        # self.linear3 = nn.Linear(hidden_dim, 1)
 
+        # identical structure
+        self.linear = nn.Sequential(
+            nn.Linear(num_inputs + num_actions, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, 1),
+            nn.ReLU()
+            )
+        
         # Q2 architecture
         self.linear4 = nn.Linear(num_inputs + num_actions, hidden_dim)
         self.linear5 = nn.Linear(hidden_dim, hidden_dim)
         self.linear6 = nn.Linear(hidden_dim, 1)
 
+        self.cnn = nn.Sequential(
+            nn.Conv2d(in_channels=1, out_channels=32, kernel_size=8, stride=4),
+            nn.ReLU(),
+            nn.Conv2d(in_channels=32, out_channels=64, kernel_size=4, stride=2),
+            nn.ReLU(),
+            nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, stride=1),
+            nn.ReLU()
+        )     
+
         self.apply(weights_init_)
 
     def forward(self, state, action):
-        print(state.shape)
-        print(action.shape)
+        # action = action.expand(-1, -1, 1004)  # action의 크기를 (256, 1, 1004)로 확장
+        state = torch.reshape(state, [-1, 1004])
+        action = torch.reshape(action, [-1, 1])
+
         xu = torch.cat([state, action], 1)
         
-        x1 = F.relu(self.linear1(xu))
-        x1 = F.relu(self.linear2(x1))
-        x1 = self.linear3(x1)
+        x1 = self.linear(xu)
 
+        # x1 = F.relu(self.linear1(xu))
+        # x1 = F.relu(self.linear2(x1))
+        # x1 = self.linear3(x1)
+        
         x2 = F.relu(self.linear4(xu))
         x2 = F.relu(self.linear5(x2))
         x2 = self.linear6(x2)
@@ -73,6 +97,14 @@ class GaussianPolicy(nn.Module):
         self.mean_linear = nn.Linear(hidden_dim, num_actions)
         self.log_std_linear = nn.Linear(hidden_dim, num_actions)
 
+        self.cnn = nn.Sequential(
+            nn.Conv2d(in_channels=1, out_channels=32, kernel_size=8, stride=4),
+            nn.ReLU(),
+            nn.Conv2d(in_channels=32, out_channels=64, kernel_size=4, stride=2),
+            nn.ReLU(),
+            nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, stride=1),
+            nn.ReLU()
+        )        
         self.apply(weights_init_)
 
         # action rescaling
@@ -86,6 +118,18 @@ class GaussianPolicy(nn.Module):
                 (action_space.high + action_space.low) / 2.)
 
     def forward(self, state):
+        # cnn layers
+        features = self.cnn(state) # state --> image data        
+        features = nn.Flatten(features)
+        # print(features.size())
+        # ex feature_size = (batch_size, 9500)
+
+        # distance information 
+        # feature_size = (batch_size, seq_length, feature_number)
+        # distance_information_size = (batch_size, size)\
+        # feature_size = torch.reshape(feature, [-1, xxx, xxx])
+        x = torch.cat([features, distance_information], dim=1)
+
         x = F.relu(self.linear1(state))
         x = F.relu(self.linear2(x))
         mean = self.mean_linear(x)

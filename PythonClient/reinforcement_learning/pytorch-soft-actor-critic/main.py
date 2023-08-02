@@ -119,7 +119,7 @@ for i_episode in itertools.count(1):
         if args.start_steps > total_numsteps:
             action = action_space.sample()  # Sample random action
         else:
-            print(state.shape)
+            # print(state.shape)
             action = agent.select_action(state)  # Sample action from policy
 
         if len(memory) > args.batch_size:
