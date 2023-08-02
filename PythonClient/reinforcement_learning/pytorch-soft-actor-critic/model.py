@@ -23,10 +23,22 @@ class ValueNetwork(nn.Module):
         self.linear1 = nn.Linear(num_inputs, hidden_dim)
         self.linear2 = nn.Linear(hidden_dim, hidden_dim)
         self.linear3 = nn.Linear(hidden_dim, 1)
-
+        
+        self.cnn = nn.Sequential(
+            nn.Conv2d(in_channels=1, out_channels=32, kernel_size=8, stride=4),
+            nn.ReLU(),
+            nn.Conv2d(in_channels=32, out_channels=64, kernel_size=4, stride=2),
+            nn.ReLU(),
+            nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, stride=1),
+            nn.ReLU()
+        )
         self.apply(weights_init_)
 
     def forward(self, state):
+        features = self.cnn(state["camera"]) # state --> image data        
+        features = nn.Flatten(features)
+        print(features.size())
+
         x = F.relu(self.linear1(state))   
         x = F.relu(self.linear2(x))
         x = self.linear3(x)
@@ -68,10 +80,10 @@ class QNetwork(nn.Module):
         self.apply(weights_init_)
 
     def forward(self, state, action):
-        # action = action.expand(-1, -1, 1004)  # action의 크기를 (256, 1, 1004)로 확장
-        state = torch.reshape(state, [-1, 1004])
-        action = torch.reshape(action, [-1, 1])
-
+        features = self.cnn(state["camera"]) # state --> image data        
+        features = nn.Flatten(features)
+        print(features.size())
+        
         xu = torch.cat([state, action], 1)
         
         x1 = self.linear(xu)
@@ -104,7 +116,7 @@ class GaussianPolicy(nn.Module):
             nn.ReLU(),
             nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, stride=1),
             nn.ReLU()
-        )        
+        )
         self.apply(weights_init_)
 
         # action rescaling
@@ -119,16 +131,17 @@ class GaussianPolicy(nn.Module):
 
     def forward(self, state):
         # cnn layers
-        features = self.cnn(state) # state --> image data        
+        features = self.cnn(state["camera"]) # state --> image data        
         features = nn.Flatten(features)
-        # print(features.size())
+        print(features.size())
+
         # ex feature_size = (batch_size, 9500)
 
         # distance information 
         # feature_size = (batch_size, seq_length, feature_number)
         # distance_information_size = (batch_size, size)\
         # feature_size = torch.reshape(feature, [-1, xxx, xxx])
-        x = torch.cat([features, distance_information], dim=1)
+        # x = torch.cat([features, distance_information], dim=1)
 
         x = F.relu(self.linear1(state))
         x = F.relu(self.linear2(x))
@@ -165,6 +178,15 @@ class DeterministicPolicy(nn.Module):
 
         self.mean = nn.Linear(hidden_dim, num_actions)
         self.noise = torch.Tensor(num_actions)
+        
+        self.cnn = nn.Sequential(
+            nn.Conv2d(in_channels=1, out_channels=32, kernel_size=8, stride=4),
+            nn.ReLU(),
+            nn.Conv2d(in_channels=32, out_channels=64, kernel_size=4, stride=2),
+            nn.ReLU(),
+            nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, stride=1),
+            nn.ReLU()
+        )
 
         self.apply(weights_init_)
 
@@ -179,12 +201,18 @@ class DeterministicPolicy(nn.Module):
                 (action_space.high + action_space.low) / 2.)
 
     def forward(self, state):
+
+        features = self.cnn(state["camera"]) # state --> image data        
+        features = nn.Flatten(features)
+        print(features.size())
+
         x = F.relu(self.linear1(state))
         x = F.relu(self.linear2(x))
         mean = torch.tanh(self.mean(x)) * self.action_scale + self.action_bias
         return mean
 
     def sample(self, state):
+        
         mean = self.forward(state)
         noise = self.noise.normal_(0., std=0.1)
         noise = noise.clamp(-0.25, 0.25)

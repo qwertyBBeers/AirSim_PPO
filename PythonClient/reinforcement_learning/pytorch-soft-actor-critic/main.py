@@ -69,7 +69,7 @@ observation_space = 1004
 # 연속적인 행동 공간 정의
 low = -1.0
 high = 1.0
-action_space = spaces.Box(low=low, high=high, shape=(1,), dtype=np.float32)
+action_space = spaces.Box(low=low, high=high, shape=(1,))
 
 # Agent
 #state_dim, action_dim 넣기
@@ -93,28 +93,6 @@ for i_episode in itertools.count(1):
     state = env.reset()
     
     while not done:
-        
-        lidar_data = state["lidar"]
-        lidar_data /= 20
-        non_zero = lidar_data[:, 1] != 0
-        lidar_data[non_zero,1] = (lidar_data[non_zero, 1] + 1)/2
-        lidar_data = lidar_data.reshape(1,1000)
-        # print("---------checking lidar_data.shape : ")
-        # print(lidar_data)
-
-        position_data = state["position"]
-        position_data[0] = position_data[0]/33.4
-        position_data[1] = position_data[1]/25.35
-        position_data = position_data.reshape(1, 2)
-        # print(position_data)
-        # print("---------checking position_data.shape : ")
-        # print(position_data)
-
-        position_state_data = state["position_state"]
-        position_state_data[0] = (position_state_data[0]-93)/57
-        position_state_data[1] = (position_state_data[1]-13.5)/27.5
-        position_state_data = position_state_data.reshape(1, 2)
-        state = np.concatenate((lidar_data, position_data, position_state_data), axis=1)
 
         if args.start_steps > total_numsteps:
             action = action_space.sample()  # Sample random action
@@ -125,7 +103,9 @@ for i_episode in itertools.count(1):
         if len(memory) > args.batch_size:
             # Number of updates per step in environment
             for i in range(args.updates_per_step):
+                
                 # Update parameters of all the networks
+
                 critic_1_loss, critic_2_loss, policy_loss, ent_loss, alpha = agent.update_parameters(memory, args.batch_size, updates)
 
                 writer.add_scalar('loss/critic_1', critic_1_loss, updates)
@@ -136,28 +116,6 @@ for i_episode in itertools.count(1):
                 updates += 1
 
         next_state, reward, done, _ = env.step(action) # Step
-        
-        lidar_data = next_state["lidar"]
-        lidar_data /= 20
-        non_zero = lidar_data[:, 1] != 0
-        lidar_data[non_zero,1] = (lidar_data[non_zero, 1] + 1)/2
-        lidar_data = lidar_data.reshape(1,1000)
-        # print("---------checking lidar_data.shape : ")
-        # print(lidar_data)
-
-        position_data = next_state["position"]
-        position_data[0] = position_data[0]/33.4
-        position_data[1] = position_data[1]/25.35
-        position_data = position_data.reshape(1, 2)
-        # print(position_data)
-        # print("---------checking position_data.shape : ")
-        # print(position_data)
-
-        position_state_data = next_state["position_state"]
-        position_state_data[0] = (position_state_data[0]-93)/57
-        position_state_data[1] = (position_state_data[1]-13.5)/27.5
-        position_state_data = position_state_data.reshape(1, 2)
-        obs_state = np.concatenate((lidar_data, position_data, position_state_data), axis=1)
 
         episode_steps += 1
         total_numsteps += 1
@@ -167,7 +125,7 @@ for i_episode in itertools.count(1):
         # (https://github.com/openai/spinningup/blob/master/spinup/algos/sac/sac.py)
         mask = 1 if episode_steps == 2000 else float(not done)
 
-        memory.push(state, action, reward, obs_state, mask) # Append transition to memory
+        memory.push(state, action, reward, next_state, mask) # Append transition to memory
 
         state = next_state
 
