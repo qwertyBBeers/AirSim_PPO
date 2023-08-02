@@ -5,7 +5,7 @@ import time
 import gym
 import random
 import typing
-
+import cv2
 from gym import spaces
 from airgym.envs.airsim_env import AirSimEnv
  
@@ -79,9 +79,35 @@ class AirSimDroneEnv(AirSimEnv):
         
         #lidar 정보 업데이트    
         self.state["lidar"] = self.lidar_obs()
+        self.state["camera"] = self._get_depth_img()
         self.state["collision"] = collision
+
         return self.state
     
+    #depth img깊이 기본값으로는 20m로 설정
+    def _get_depth_img(self,MIN_DEPTH=0,MAX_DEPTH=20): 
+        
+
+        # Request DepthPerspective image as uncompressed float
+        response = self.drone.simGetImages([airsim.ImageRequest("front", airsim.ImageType.DepthPerspective, True, False)])[0]
+
+        # Reshape to a 2d array with correct width and height
+        depth_img = airsim.list_to_2d_float_array(response.image_data_float, response.width, response.height)
+        depth_img = depth_img.reshape(response.height, response.width, 1)
+        
+        # Lerp 0..5m to 0..255gray values
+        depth_img= np.interp(depth_img, (MIN_DEPTH, MAX_DEPTH), (0,255))
+        
+        #print(np.shape(depth_img))
+        #0~1로 정규화
+        depth_norm=cv2.normalize(depth_img, None, 0, 1, cv2.NORM_MINMAX)
+
+        #return값 있을때는 왠만한면 waitkey,imshow 안쓰는게 좋음 json 파일에 SubWindow 설정으로해서 보는게 이득 
+        #cv2.imshow("normalized_depth",depth_norm)
+        #cv2.waitKey(1)
+
+        return depth_norm
+
     def lidar_obs(self):
         #총 500개의 배열에 lidar 정보가 들  어온 만큼이 들어간다.
         lidar_data = self.drone.getLidarData()
@@ -237,6 +263,7 @@ class AirSimDroneEnv(AirSimEnv):
         return reward, done
 
     def step(self, action):
+
         self._do_action(action)
         obs = self._get_obs()
         reward, done = self._compute_reward()

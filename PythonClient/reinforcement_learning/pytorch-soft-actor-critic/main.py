@@ -6,6 +6,8 @@ import numpy as np
 import itertools
 import torch
 from sac import SAC
+import torch.nn as nn
+import torch.nn.functional as F
 from torch.utils.tensorboard import SummaryWriter
 from replay_memory import ReplayMemory
 import sys
@@ -64,12 +66,12 @@ np.random.seed(args.seed)
 #action_space 설정
 
 # 환경 차원 정의
-observation_space = 1004
+observation_space = 3140
 
 # 연속적인 행동 공간 정의
 low = -1.0
 high = 1.0
-action_space = spaces.Box(low=low, high=high, shape=(1,))
+action_space = spaces.Box(low=low, high=high, shape=(1,1))
 
 # Agent
 #state_dim, action_dim 넣기
@@ -82,6 +84,17 @@ writer = SummaryWriter('runs/{}_SAC_{}_{}_{}'.format(datetime.datetime.now().str
 # Memory
 memory = ReplayMemory(args.replay_size, args.seed)
 
+#CNN 구축
+cnn = nn.Sequential(
+            nn.Conv2d(in_channels=1, out_channels=32, kernel_size=8, stride=4),
+            nn.ReLU(),
+            nn.Conv2d(in_channels=32, out_channels=64, kernel_size=4, stride=2),
+            nn.ReLU(),
+            nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, stride=1),
+            nn.ReLU(),
+            nn.Flatten()
+        )
+
 # Training Loop
 total_numsteps = 0
 updates = 0
@@ -90,10 +103,26 @@ for i_episode in itertools.count(1):
     episode_reward = 0
     episode_steps = 0
     done = False
+
     state = env.reset()
     
+    camera = torch.tensor(state["camera"])
+    camera = torch.unsqueeze(camera, 0)
+    camera = torch.unsqueeze(camera, 0)
+    camera = camera.float()
+    features = cnn(camera) # state --> image data        
+    
+    #torch.Size([1, 3136])
+    position = state["position"].reshape(1,2)
+    position_state = state["position_state"].reshape(1,2)
+    position = torch.tensor(position)
+    position_state = torch.tensor(position_state)
+    
+    state = torch.cat((features, position, position_state), dim=1)
+    state = state.detach().numpy()
+    
     while not done:
-
+        
         if args.start_steps > total_numsteps:
             action = action_space.sample()  # Sample random action
         else:
@@ -114,9 +143,23 @@ for i_episode in itertools.count(1):
                 writer.add_scalar('loss/entropy_loss', ent_loss, updates)
                 writer.add_scalar('entropy_temprature/alpha', alpha, updates)
                 updates += 1
-
+        
         next_state, reward, done, _ = env.step(action) # Step
 
+        camera = torch.tensor(next_state["camera"])
+        camera = torch.unsqueeze(camera, 0)
+        camera = torch.unsqueeze(camera, 0)
+        camera = camera.float()
+        features = cnn(camera) # state --> image data        
+        
+        #torch.Size([1, 3136])
+        position = next_state["position"].reshape(1,2)
+        position_state = next_state["position_state"].reshape(1,2)
+        position = torch.tensor(position)
+        position_state = torch.tensor(position_state)
+        
+        next_state = torch.cat((features, position, position_state), dim=1)
+        next_state = next_state.detach().numpy()
         episode_steps += 1
         total_numsteps += 1
         episode_reward += reward
@@ -139,15 +182,45 @@ for i_episode in itertools.count(1):
         avg_reward = 0.
         episodes = 10
         for _  in range(episodes):
+            
             state = env.reset()
+
+            camera = torch.tensor(state["camera"])
+            camera = torch.unsqueeze(camera, 0)
+            camera = torch.unsqueeze(camera, 0)
+            camera = camera.float()
+            features = cnn(camera) # state --> image data        
+            
+            #torch.Size([1, 3136])
+            position = state["position"].reshape(1,2)
+            position_state = state["position_state"].reshape(1,2)
+            position = torch.tensor(position)
+            position_state = torch.tensor(position_state)
+            
+            state = torch.cat((features, position, position_state), dim=1)
+            state = state.detach().numpy()
+
             episode_reward = 0
             done = False
-            while not done:
+            while not done:             
                 action = agent.select_action(state, evaluate=True)
 
                 next_state, reward, done, _ = env.step(action)
                 episode_reward += reward
 
+                camera = torch.tensor(next_state["camera"])
+                camera = torch.unsqueeze(camera, 0)
+                camera = torch.unsqueeze(camera, 0)
+                camera = camera.float()
+                features = cnn(camera) # state --> image data        
+                
+                #torch.Size([1, 3136])
+                position = next_state["position"].reshape(1,2)
+                position_state = next_state["position_state"].reshape(1,2)
+                position = torch.tensor(position)
+                position_state = torch.tensor(position_state)
+                
+                next_state = torch.cat((features, position, position_state), dim=1)
 
                 state = next_state
             avg_reward += episode_reward

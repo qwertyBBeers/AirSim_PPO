@@ -218,39 +218,15 @@ def train():
         
         for t in range(1, max_ep_len+1):
             # select action with policy
-            lidar_data = state["lidar"]
-            lidar_data /= 20
-            non_zero = lidar_data[:, 1] != 0
-            lidar_data[non_zero,1] = (lidar_data[non_zero, 1] + 1)/2
-            lidar_data = lidar_data.reshape(1,1000)
-            # print("---------checking lidar_data.shape : ")
-            # print(lidar_data)
-
-            position_data = state["position"]
-            position_data[0] = position_data[0]/33.4
-            position_data[1] = position_data[1]/25.35
-            position_data = position_data.reshape(1, 2)
-            # print(position_data)
-            # print("---------checking position_data.shape : ")
-            # print(position_data)
-
-            position_state_data = state["position_state"]
-            position_state_data[0] = (position_state_data[0]-93)/57
-            position_state_data[1] = (position_state_data[1]-13.5)/27.5
-            position_state_data = position_state_data.reshape(1, 2)
-            # print("---------checking position_state.shape : ")
-            # print(position_state_data)
-            state_data = np.concatenate((lidar_data, position_data, position_state_data), axis=1)
 
             # print("---------checking state_data.shape : ")
             # print(state_data.shape)
 
             # print("++++++++++checking state_data_reshaped.shape : ")
             # print(state_data_reshaped.shape)
-            action = ppo_agent.select_action(state_data)
+            action = ppo_agent.select_action(state)
             
             # saving reward and is_terminals
-
             # restart simulation            
             env.drone.simPause(is_paused=True)  # Pause the simulation
             # if random_flag:
