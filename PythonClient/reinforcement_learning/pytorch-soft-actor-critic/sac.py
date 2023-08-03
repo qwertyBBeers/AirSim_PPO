@@ -1,11 +1,13 @@
 import os
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 from torch.optim import Adam
 from utils import soft_update, hard_update
 from model import GaussianPolicy, QNetwork, DeterministicPolicy
 import numpy as np
 
+# SAC model
 class SAC(object):
     #SAC 클래스 생성자 메서드 정의. 입력 차원, 액션 공간, 기타 설정 값 받는다.
     def __init__(self, num_inputs, action_space, args):
@@ -20,6 +22,7 @@ class SAC(object):
 
         self.device = torch.device("cuda" if args.cuda else "cpu")
 
+        # 심층망 적용.
         self.critic = QNetwork(num_inputs, action_space.shape[0], args.hidden_size).to(device=self.device)
         self.critic_optim = Adam(self.critic.parameters(), lr=args.lr)
 
@@ -41,14 +44,60 @@ class SAC(object):
             self.automatic_entropy_tuning = False
             self.policy = DeterministicPolicy(num_inputs, action_space.shape[0], args.hidden_size, action_space).to(self.device)
             self.policy_optim = Adam(self.policy.parameters(), lr=args.lr)
+    
+    def cnn_nomalize(self, state):
+        
+        self.cnn = nn.Sequential(
+            nn.Conv2d(in_channels=1, out_channels=32, kernel_size=8, stride=4),
+            nn.ReLU(),
+            nn.Conv2d(in_channels=32, out_channels=64, kernel_size=4, stride=2),
+            nn.ReLU(),
+            nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, stride=1),
+            nn.ReLU(),
+            nn.Flatten()
+        )
 
+        self.fc_layers = nn.Sequential(
+            nn.Linear(3136, 64),  # 이미지 크기가 84x84이므로, MaxPool2d로 인해 크기가 21x21이 됩니다.
+            nn.ReLU(),
+            nn.Linear(64, 40),
+        )
+
+        img=torch.tensor(state["camera"].astype(np.float32)).unsqueeze(0).unsqueeze(0)
+
+        state["position"][0] = (state["position"][0]+23.6)/57
+        state["position"][1] = (state["position"][1]+2.15)/27.5
+        pose=np.tile(state["position"].astype(np.float32) , (1, 20))
+        pose=torch.tensor(pose)
+    
+        state["position_state"][0] = (state["position_state"][0]-93)/57
+        state["position_state"][1] = (state["position_state"][1]-13.5)/27.5
+        pos_stat=np.tile(state["position_state"].astype(np.float32) , (1, 20))
+        pos_stat=torch.tensor(pos_stat)
+        
+        state["position_vel"][0] = state["position_vel"][0]/3.0
+        state["position_vel"][1] = state["position_vel"][1]/3.0
+        pos_vel=np.tile(state["position_vel"].astype(np.float32) , (1, 20))
+        pos_vel=torch.tensor(pos_vel)
+
+        features = self.cnn(img)
+        # features = self.fc_layers(features)
+        # 새로운 크기로 데이터를 upscaling
+
+        # Concatenate CNN features and state information
+        x = torch.cat([features,pose,pos_stat,pos_vel], dim=1)
+
+        return x
+    
     def select_action(self, state, evaluate=False):
         # state = torch.FloatTensor(state).to(self.device).unsqueeze(0)
         state = torch.tensor(state, dtype=torch.float32).to(self.device).unsqueeze(0)
 
         if evaluate is False:
+            # gaussianPolicy
             action, _, _ = self.policy.sample(state)
         else:
+            # 모델 평가
             _, _, action = self.policy.sample(state)
         return action.detach().cpu().numpy()[0]
 
