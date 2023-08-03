@@ -12,6 +12,7 @@ from torch.utils.tensorboard import SummaryWriter
 from replay_memory import ReplayMemory
 import sys
 import os
+
 sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
 from airgym.envs.hmue_env import AirSimDroneEnv
 
@@ -53,8 +54,6 @@ parser.add_argument('--replay_size', type=int, default=1000000, metavar='N',
 parser.add_argument('--cuda', action="store_true",
                     help='run on CUDA (default: False)')
 args = parser.parse_args()
-
-# 전처리
 
 # Environment
 # env = NormalizedActions(gym.make(args.env_name))
@@ -98,6 +97,8 @@ cnn = nn.Sequential(
 # Training Loop
 total_numsteps = 0
 updates = 0
+reward_val = 0
+episode_val = 0
 
 for i_episode in itertools.count(1):
     episode_reward = 0
@@ -113,8 +114,14 @@ for i_episode in itertools.count(1):
     features = cnn(camera) # state --> image data        
     
     #torch.Size([1, 3136])
+    state["position"][0] = (state["position"][0]+23.6)/57
+    state["position"][1] = (state["position"][1]+2.15)/27.5
     position = state["position"].reshape(1,2)
+
+    state["position_state"][0] = (state["position_state"][0]-93)/57
+    state["position_state"][1] = (state["position_state"][1]-13.5)/27.5
     position_state = state["position_state"].reshape(1,2)
+    
     position = torch.tensor(position)
     position_state = torch.tensor(position_state)
     
@@ -153,7 +160,12 @@ for i_episode in itertools.count(1):
         features = cnn(camera) # state --> image data        
         
         #torch.Size([1, 3136])
+        next_state["position"][0] = (next_state["position"][0]+23.6)/57
+        next_state["position"][1] = (next_state["position"][1]+2.15)/27.5
         position = next_state["position"].reshape(1,2)
+
+        next_state["position_state"][0] = (next_state["position_state"][0]-93)/57
+        next_state["position_state"][1] = (next_state["position_state"][1]-13.5)/27.5
         position_state = next_state["position_state"].reshape(1,2)
         position = torch.tensor(position)
         position_state = torch.tensor(position_state)
@@ -163,7 +175,7 @@ for i_episode in itertools.count(1):
         episode_steps += 1
         total_numsteps += 1
         episode_reward += reward
-
+        reward_val += reward
         # Ignore the "done" signal if it comes from hitting the time horizon.
         # (https://github.com/openai/spinningup/blob/master/spinup/algos/sac/sac.py)
         mask = 1 if episode_steps == 2000 else float(not done)
@@ -174,13 +186,16 @@ for i_episode in itertools.count(1):
 
     if total_numsteps > args.num_steps:
         break
-
-    writer.add_scalar('reward/train', episode_reward, i_episode)
+    
+    
+    
     print("Episode: {}, total numsteps: {}, episode steps: {}, reward: {}".format(i_episode, total_numsteps, episode_steps, round(episode_reward, 2)))
 
     if i_episode % 10 == 0 and args.eval is True:
+        reward_val = reward_val / 10
+        writer.add_scalar('reward/avg', reward_val, i_episode)
         avg_reward = 0.
-        episodes = 10
+        episodes = 1
         for _  in range(episodes):
             
             state = env.reset()
@@ -192,7 +207,12 @@ for i_episode in itertools.count(1):
             features = cnn(camera) # state --> image data        
             
             #torch.Size([1, 3136])
+            state["position"][0] = (state["position"][0]+23.6)/57
+            state["position"][1] = (state["position"][1]+2.15)/27.5
             position = state["position"].reshape(1,2)
+
+            state["position_state"][0] = (state["position_state"][0]-93)/57
+            state["position_state"][1] = (state["position_state"][1]-13.5)/27.5
             position_state = state["position_state"].reshape(1,2)
             position = torch.tensor(position)
             position_state = torch.tensor(position_state)
@@ -215,7 +235,12 @@ for i_episode in itertools.count(1):
                 features = cnn(camera) # state --> image data        
                 
                 #torch.Size([1, 3136])
+                next_state["position"][0] = (next_state["position"][0]+23.6)/57
+                next_state["position"][1] = (next_state["position"][1]+2.15)/27.5
                 position = next_state["position"].reshape(1,2)
+
+                next_state["position_state"][0] = (next_state["position_state"][0]-93)/57
+                next_state["position_state"][1] = (next_state["position_state"][1]-13.5)/27.5
                 position_state = next_state["position_state"].reshape(1,2)
                 position = torch.tensor(position)
                 position_state = torch.tensor(position_state)
