@@ -53,7 +53,7 @@ class AirSimDroneEnv(AirSimEnv):
         pose = airsim.Pose(position)
         self.drone.simSetVehiclePose(pose, ignore_collision=True)
 
-        self.drone.moveToPositionAsync(self.start_x, self.start_y, start_z, 3).join()
+        self.drone.moveToPositionAsync(self.start_x, self.start_y, start_z, 0)
         # self.drone.moveByVelocityAsync(0, 0.0, 1.0, 0).join()
         # 초기 드론 위치를 여기서 설정
     
@@ -75,8 +75,6 @@ class AirSimDroneEnv(AirSimEnv):
         
         #camera 정보 업데이트    
         self.state["camera"] = self._get_depth_img()
-        cv2.imshow("normalized_depth",self.depth_norm)
-        cv2.waitKey(1)
 
         self.state["collision"] = collision
 
@@ -164,11 +162,11 @@ class AirSimDroneEnv(AirSimEnv):
 
         if self.state['collision'] == True:
             done = 1
-            collision = -10
+            collision = -30
         
         # 일정 boundary 생성, 일정 범위 밖으로 나가게 되면 episode 끝 및 reward 낮은 값 줌
         elif x_val >= 150.0 or x_val<= 92.0 or y_val > 41.0 or y_val < 13.5:
-            out = -10
+            out = -30
             done = 1
 
 
