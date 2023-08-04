@@ -17,6 +17,7 @@ class AirSimDroneEnv(AirSimEnv):
             "collision" : False,
             "position_state" : np.zeros([1, 2]),
             "camera" : np.zeros((84, 84, 1)),
+            "position_vel" : np.zeros([1, 2])
         }
 
         self.drone = airsim.MultirotorClient(ip=ip_address)
@@ -41,7 +42,7 @@ class AirSimDroneEnv(AirSimEnv):
 
         self.start_x = random_start[0]
         self.start_y = random_start[1]
-        start_z = -1
+        start_z = -2
 
         start_index = start_position.index(random_start)
         
@@ -53,7 +54,7 @@ class AirSimDroneEnv(AirSimEnv):
         self.drone.simSetVehiclePose(pose, ignore_collision=True)
 
         self.drone.moveToPositionAsync(self.start_x, self.start_y, start_z, 3).join()
-        # self.drone.moveByVelocityAsync(0, 0.0, 0.5, 0).join()
+        # self.drone.moveByVelocityAsync(0, 0.0, 1.0, 0).join()
         # 초기 드론 위치를 여기서 설정
     
     def _get_obs(self):
@@ -74,7 +75,15 @@ class AirSimDroneEnv(AirSimEnv):
         
         #camera 정보 업데이트    
         self.state["camera"] = self._get_depth_img()
+        cv2.imshow("normalized_depth",self.depth_norm)
+        cv2.waitKey(1)
+
         self.state["collision"] = collision
+
+        self.state["position_vel"] = np.array([
+            self.drone_state.kinematics_estimated.linear_velocity.x_val,
+            self.drone_state.kinematics_estimated.linear_velocity.y_val
+        ])
 
         return self.state
     
@@ -93,15 +102,15 @@ class AirSimDroneEnv(AirSimEnv):
         
         #print(np.shape(depth_img))
         #0~1로 정규화
-        depth_norm=cv2.normalize(depth_img, None, 0, 1, cv2.NORM_MINMAX)
+        self.depth_norm=cv2.normalize(depth_img, None, 0, 1, cv2.NORM_MINMAX)
 
         #return값 있을때는 왠만한면 waitkey,imshow 안쓰는게 좋음 json 파일에 SubWindow 설정으로해서 보는게 이득 
-        #cv2.imshow("normalized_depth",depth_norm)
+        # cv2.imshow("normalized_depth",self.depth_norm)
         #cv2.waitKey(1)
-        return depth_norm
+        return self.depth_norm
 
     def _do_action(self, action):
-        yaw_rate = action*20
+        yaw_rate = action*30
         vx_action = 3.0
         #x축 속도 고정, yaw의 회전만으로 장애물 회피
 
@@ -115,16 +124,17 @@ class AirSimDroneEnv(AirSimEnv):
 
     def AF(self):
 
-        att_gain = 0.5
+        att_gain = 1
         # [0 ~ 1] nomalize
-        distance = np.linalg.norm([self.state["position"][0],self.state["position"][1]]) / 63.28
-        att_Force = att_gain*distance
+        distance = (self.state["position"][0]**2 + self.state["position"][1]**2)**0.5
+        # distance = np.linalg.norm([self.state["position"][0],self.state["position"][1]]) / 63.28
+        att_Force = att_gain*7.87*(1/distance - 1/63.2)
         return att_Force
     
     #nomalize [0 ~ 1]
 
     def vector(self):
-        vector_gain = 0.1
+        vector_gain = 1
         yaw = airsim.to_eularian_angles(self.drone_state.kinematics_estimated.orientation)[2]
         
         x = np.cos(yaw)
@@ -132,7 +142,7 @@ class AirSimDroneEnv(AirSimEnv):
 
         direction_vector = np.array([x, y])
 
-        distance = np.linalg.norm([self.state["position"][0],self.state["position"][1]])
+        distance = (self.state["position"][0]**2 + self.state["position"][1]**2)**0.5
         target_vector = self.state["position"]/distance # 현재 방향 벡터
 
         # 많이 다르면 0, 방향이 같으면 1
@@ -154,23 +164,24 @@ class AirSimDroneEnv(AirSimEnv):
 
         if self.state['collision'] == True:
             done = 1
-            collision = -80
+            collision = -10
         
         # 일정 boundary 생성, 일정 범위 밖으로 나가게 되면 episode 끝 및 reward 낮은 값 줌
         elif x_val >= 150.0 or x_val<= 92.0 or y_val > 41.0 or y_val < 13.5:
-            out = -80
+            out = -10
             done = 1
 
 
         elif self.state["position"][0]<7 and self.state["position"][1]<7:
             done = 1
-            goal = 100
+            goal = 50
             print("GOAL REACHED")
 
         else:
             done = 0
         
         # AF = 거리, RF = 장애물 충돌(lidar를 사용하지 않아 제거), vector = 방향
+        # APF = -self.AF() + self.vector()
         APF = self.AF() + self.vector()
 
         reward = APF + collision + goal + out

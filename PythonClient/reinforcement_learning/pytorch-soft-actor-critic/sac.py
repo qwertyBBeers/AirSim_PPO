@@ -11,7 +11,11 @@ import numpy as np
 class SAC(object):
     #SAC 클래스 생성자 메서드 정의. 입력 차원, 액션 공간, 기타 설정 값 받는다.
     def __init__(self, num_inputs, action_space, args):
-
+        
+        self.action_layer = nn.Sequential(
+            nn.Linear(1, 160),
+            nn.ReLU(),
+        )   
         self.gamma = args.gamma
         self.tau = args.tau
         self.alpha = args.alpha
@@ -23,10 +27,16 @@ class SAC(object):
         self.device = torch.device("cuda" if args.cuda else "cpu")
 
         # 심층망 적용.
+        action_space = torch.tensor(action_space.sample())
+        action_space = self.action_layer(action_space)
+        
         self.critic = QNetwork(num_inputs, action_space.shape[0], args.hidden_size).to(device=self.device)
+        # self.critic = QNetwork(num_inputs, action_space, args.hidden_size).to(device=self.device)
         self.critic_optim = Adam(self.critic.parameters(), lr=args.lr)
 
         self.critic_target = QNetwork(num_inputs, action_space.shape[0], args.hidden_size).to(self.device)
+        # self.critic_target = QNetwork(num_inputs, action_space, args.hidden_size).to(self.device)
+
         hard_update(self.critic_target, self.critic)
 
         if self.policy_type == "Gaussian":
@@ -37,12 +47,15 @@ class SAC(object):
                 self.alpha_optim = Adam([self.log_alpha], lr=args.lr)
 
             self.policy = GaussianPolicy(num_inputs, action_space.shape[0], args.hidden_size, action_space).to(self.device)
+            # self.policy = GaussianPolicy(num_inputs, action_space, args.hidden_size, action_space).to(self.device)
             self.policy_optim = Adam(self.policy.parameters(), lr=args.lr)
 
         else:
             self.alpha = 0
             self.automatic_entropy_tuning = False
             self.policy = DeterministicPolicy(num_inputs, action_space.shape[0], args.hidden_size, action_space).to(self.device)
+            # self.policy = DeterministicPolicy(num_inputs, action_space, args.hidden_size, action_space).to(self.device)
+
             self.policy_optim = Adam(self.policy.parameters(), lr=args.lr)
     
     def cnn_nomalize(self, state):
@@ -54,39 +67,47 @@ class SAC(object):
             nn.ReLU(),
             nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, stride=1),
             nn.ReLU(),
-            nn.Flatten()
+            nn.Flatten(),
         )
 
         self.fc_layers = nn.Sequential(
-            nn.Linear(3136, 64),  # 이미지 크기가 84x84이므로, MaxPool2d로 인해 크기가 21x21이 됩니다.
+            nn.Linear(3136, 40),  # 이미지 크기가 84x84이므로, MaxPool2d로 인해 크기가 21x21이 됩니다.
             nn.ReLU(),
-            nn.Linear(64, 40),
+        )
+
+        self.input_layer = nn.Sequential(
+            nn.Linear(2, 40),
+            nn.ReLU(),
         )
 
         img=torch.tensor(state["camera"].astype(np.float32)).unsqueeze(0).unsqueeze(0)
-
+        
         state["position"][0] = (state["position"][0]+23.6)/57
         state["position"][1] = (state["position"][1]+2.15)/27.5
-        pose=np.tile(state["position"].astype(np.float32) , (1, 20))
-        pose=torch.tensor(pose)
+        pose=state["position"]
+        pose = torch.tensor(pose.astype(np.float32)).unsqueeze(0)
+        pose = self.input_layer(pose)
     
         state["position_state"][0] = (state["position_state"][0]-93)/57
         state["position_state"][1] = (state["position_state"][1]-13.5)/27.5
-        pos_stat=np.tile(state["position_state"].astype(np.float32) , (1, 20))
-        pos_stat=torch.tensor(pos_stat)
+        pos_stat=state["position_state"]
+        pos_stat=torch.tensor(pos_stat.astype(np.float32)).unsqueeze(0)
+        pos_stat=self.input_layer(pos_stat)
         
         state["position_vel"][0] = state["position_vel"][0]/3.0
         state["position_vel"][1] = state["position_vel"][1]/3.0
-        pos_vel=np.tile(state["position_vel"].astype(np.float32) , (1, 20))
-        pos_vel=torch.tensor(pos_vel)
+        pos_vel=state["position_vel"]
+        pos_vel=torch.tensor(pos_vel.astype(np.float32)).unsqueeze(0)
+        pos_vel=self.input_layer(pos_vel)
 
         features = self.cnn(img)
+        features = self.fc_layers(features)
         # features = self.fc_layers(features)
         # 새로운 크기로 데이터를 upscaling
-
+        
         # Concatenate CNN features and state information
         x = torch.cat([features,pose,pos_stat,pos_vel], dim=1)
-
+        
         return x
     
     def select_action(self, state, evaluate=False):

@@ -99,13 +99,12 @@ np.random.seed(args.seed)
 
 # 환경 차원 정의
 # input으로 들어가는 차원을 정의
-observation_space = 3256
+observation_space = 160
 
 # 연속적인 행동 공간 정의
 low = -1.0
 high = 1.0
 action_space = spaces.Box(low=low, high=high, shape=(1,1))
-
 # Agent
 #state_dim, action_dim 넣기
 agent = SAC(observation_space, action_space, args)

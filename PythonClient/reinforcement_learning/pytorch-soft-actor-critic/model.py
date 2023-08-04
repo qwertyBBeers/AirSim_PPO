@@ -34,7 +34,6 @@ class ValueNetwork(nn.Module):
 class QNetwork(nn.Module):
     def __init__(self, num_inputs, num_actions, hidden_dim):
         super(QNetwork, self).__init__()
-
         # Q1 architecture
         self.linear1 = nn.Linear(num_inputs + num_actions, hidden_dim)
         self.linear2 = nn.Linear(hidden_dim, hidden_dim)
@@ -78,10 +77,8 @@ class GaussianPolicy(nn.Module):
             self.action_scale = torch.tensor(1.)
             self.action_bias = torch.tensor(0.)
         else:
-            self.action_scale = torch.FloatTensor(
-                (action_space.high - action_space.low) / 2.)
-            self.action_bias = torch.FloatTensor(
-                (action_space.high + action_space.low) / 2.)
+            self.action_scale = torch.tensor(1.)
+            self.action_bias = torch.tensor(0.)
 
     def forward(self, state):
         x = F.relu(self.linear1(state))
@@ -126,10 +123,8 @@ class DeterministicPolicy(nn.Module):
             self.action_scale = 1.
             self.action_bias = 0.
         else:
-            self.action_scale = torch.FloatTensor(
-                (action_space.high - action_space.low) / 2.)
-            self.action_bias = torch.FloatTensor(
-                (action_space.high + action_space.low) / 2.)
+            self.action_scale = 1.
+            self.action_bias = 0.
 
     def forward(self, state):
         x = F.relu(self.linear1(state))
